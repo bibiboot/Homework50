@@ -22,6 +22,12 @@
 #define PHASE3_UDP_BIDDER2_PORT "9005"
 #define MAXBUFLEN 100
 
+struct bid {
+    char name[100];
+    char item[100];
+    char price[100];
+};
+
 
 int ipaddr_client(struct sockaddr cli_addr, char **human_cli_addr){
     /*Convert sockaddr to human string ip address*/
@@ -44,6 +50,33 @@ int read_BFILE(char *tmesg){
     }
     return 0;
 }
+
+int text_to_bid_struct(struct bid *b){
+    FILE *fp;
+    char buff[100];
+    fp = fopen(BFILE, "r");
+    int i=0;
+    while(fgets(buff, 100, fp)!=NULL){
+        sscanf(buff, "%[^ ] %[^ ] %s", b[i].name, b[i].item, b[i].price);
+        i++;
+    }
+    return 0;
+}
+
+int file_to_bid_struct(struct bid *b, char *path, int *size){
+    FILE *fp;
+    char buff[100];
+    *size = 0;
+    fp = fopen(path, "r");
+    while(fgets(buff, 100, fp)!=NULL){
+        sscanf(buff, "%[^ ] %[^ ] %s", b[*size].name, b[*size].item, b[*size].price);
+        (*size)++;
+    }
+    return 0;
+}
+
+
+
 
 int authenticate(char *mesg, char *client_ip){
     /*Return 0 is 
@@ -295,10 +328,62 @@ int phase1(){
     return 0;
 }
 
+void print_bidarray(struct bid *b){
+    int i;
+    for(i=0;i<=5;i++)
+        printf("%s\t%s\t%s\n", b[i].name, b[i].item, b[i].price);
+}
+
+int price_of(struct bid *b, int size, char *name, char *item){
+    /*Traverses the array of bids looking for the name and item*/
+    printf("Looking for %s---and Looking for %s\n", name, item);
+    int i;
+    for(i=0;i<size;i++){
+        printf("Traversing %s---and Traversing for %s\n", b[i].name, b[i].item);
+        if(strcmp(b[i].name, name)==0 && strcmp(b[i].item, item)==0){
+            /*Match found, now return*/
+            return atoi(b[i].price);
+        }
+    }
+    return -1;
+}
+
+int compare(struct bid *broadCast, int size, struct bid *b1, int size1, struct bid *b2, int size2){
+    /*Compare the values of the bids and find the appropriate match*/ 
+    int i;
+    for(i=0;i<size;i++){
+        int price1 = price_of(b1, size1, broadCast[i].name, broadCast[i].item);
+        int price2 = price_of(b2, size2, broadCast[i].name, broadCast[i].item);
+        printf("Price1 = %d Price2 = %d\n", price1, price2);
+    }
+}
+
+void test1(){
+    struct bid *barray  = (struct bid*)(malloc(sizeof(struct bid)*6));
+    text_to_bid_struct(barray);
+    struct bid *b1  = (struct bid*)(malloc(sizeof(struct bid)*6));
+    text_to_bid_struct(b1);
+    struct bid *b2  = (struct bid*)(malloc(sizeof(struct bid)*6));
+    text_to_bid_struct(b2);
+    compare(barray, 6, b1, 6, b2, 6);
+}
+
+void test2(){
+    int size, size1, size2;
+    struct bid *barray  = (struct bid*)(malloc(sizeof(struct bid)*6));
+    file_to_bid_struct(barray, BFILE, &size);
+    struct bid *b1  = (struct bid*)(malloc(sizeof(struct bid)*6));
+    file_to_bid_struct(b1, "bidding1.txt", &size1);
+    struct bid *b2  = (struct bid*)(malloc(sizeof(struct bid)*6));
+    file_to_bid_struct(b2, "bidding2.txt", &size2);
+    compare(barray, size, b1, size1, b2, size2);
+}
+
 int main(int argc, char *argv[]){
     /*Main function*/
     //phase1();
     //phase2();
-    phase3(PHASE3_UDP_BIDDER2_PORT);
+    //phase3(PHASE3_UDP_BIDDER2_PORT);
     //phase3(PHASE3_UDP_BIDDER1_PORT);
+    test2();
 }
