@@ -1,4 +1,6 @@
-Matt Dress1 50 
-Matt Dress2 80 
-John Watch1 50 
-John Watch2 100 
+Matt  Dress1 50 
+Matt  Dress2 80 
+Matt  Watch1 120
+Matt  Dress1 50 
+Matt  Dress2 80 
+Matt  Watch1 120

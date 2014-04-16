@@ -12,6 +12,10 @@
 
 #define CRED_FILE1 "bidderPass1.txt"
 #define CRED_FILE2 "bidderPass2.txt"
+#define PHASE3_UDP_BIDDER1_PORT "9004"
+#define PHASE3_UDP_BIDDER2_PORT "9005"
+
+#define MAXBUFLEN 100
 
 char PORT[100] = "9001";
 char HOST[100] = "127.0.0.1";
@@ -40,7 +44,51 @@ int get_cred(int btype, char *result){
     return 0;
 }
 
-void start(int btype){
+int phase3(int btype, char *port){
+    struct addrinfo hints, *res;
+    char mesg[1000], auth_mesg[100];
+    struct sockaddr_storage their_addr;
+    char buf[MAXBUFLEN];
+    socklen_t addr_len;
+
+    memset(&hints, 0, 1000);
+    hints.ai_family = AF_INET;
+    hints.ai_socktype = SOCK_DGRAM;
+
+    if((getaddrinfo(HOST, port, &hints, &res)) != 0){
+        perror("GetAddrInfo");
+        exit(0);
+    }
+
+    /*PRINT*/
+    printf("Phase 3: <Bidder%d#> has UDP port %s and IP address: %s\n", btype, port, HOST);
+
+    int sock = socket(res->ai_family, res->ai_socktype, 0);
+    if(sock==-1){
+        perror("Socket");
+        exit(0);
+    }
+
+    if(bind(sock, res->ai_addr, res->ai_addrlen)==-1){
+        perror("Bind");
+        exit(0);
+    }
+
+    int numbytes;
+    if ((numbytes = recvfrom(sock, buf, MAXBUFLEN-1 , 0, (struct sockaddr *)&their_addr, &addr_len)) == -1) {
+        perror("recvfrom");
+        exit(1);
+    }
+
+    /*PRINT*/
+    printf("Phase 3: %s\n", buf);
+
+    /*PRINT*/
+    printf("End of Phase 3 for Bidder%d.\n", btype);
+}
+
+
+void phase1(int btype){
 
     struct addrinfo hints, *res;
     char buff[9000];
@@ -77,16 +125,15 @@ void start(int btype){
 
 int bidder1(){
     /*Bidder two run by parent process*/
-    //printf("Parent\n");
-    start(1);
-
+    //phase1(1);
+    phase3(1, PHASE3_UDP_BIDDER1_PORT);
     return 0;
 }
 
 int bidder2(){
     /*Bidder two run by child process*/
-    //printf("Child\n");
-    start(2);
+    //phase1(2);
+    phase3(2, PHASE3_UDP_BIDDER2_PORT);
     return 1;
 }
 
@@ -98,12 +145,10 @@ int main(int argc, char *argv[]){
     }
     else{
         /*Parent*/
-        bidder1();
-
+        //bidder1();
     }
     
     /*Wait for the child to over itself*/
     int status;
     waitpid(pid, &status, 0);
 }
-
