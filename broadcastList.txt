@@ -1,6 +1,8 @@
-Matt  Dress1 50 
-Matt  Dress2 80 
-Matt  Watch1 120
-Matt  Dress1 50 
-Matt  Dress2 80 
-Matt  Watch1 120
+Taylor Skirt1 50
+Taylor Shirt1 100
+Taylor Watch1 120
+Julia Skirt1 80
+Julia Shirt2 100
+Julia Watch1 100
+Julia Watch2 150
+

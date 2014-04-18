@@ -12,13 +12,30 @@
 
 #define CRED_FILE1 "bidderPass1.txt"
 #define CRED_FILE2 "bidderPass2.txt"
-#define PHASE3_UDP_BIDDER1_PORT "9004"
-#define PHASE3_UDP_BIDDER2_PORT "9005"
+#define PHASE3_UDP_BID1_PORT "3100"
+#define PHASE3_UDP_BID2_PORT "3200"
+#define PHASE3_UDP_AS_BID1_PORT "6200"
+#define PHASE3_UDP_AS_BID2_PORT "6300"
 
 #define MAXBUFLEN 100
 
-char PORT[100] = "9001";
+char PORT[100] = "1100";
 char HOST[100] = "127.0.0.1";
+
+int read_FILE(char *tmesg, char *path){
+    /*Read from the correct itemList.txt and
+    */
+    FILE *fp;
+    char buff[100];
+    strcpy(tmesg, "");
+    fp = fopen(path, "r");
+
+    while(fgets(buff, 100, fp)!=NULL){
+        /*Rest of the lines create message and send*/
+        strcat(tmesg, buff);
+    }
+    return 0;
+}
 
 int ipaddr_client(struct sockaddr cli_addr, char **human_cli_addr){
     /*Convert sockaddr to human string ip address*/
@@ -44,18 +61,24 @@ int get_cred(int btype, char *result){
     return 0;
 }
 
-int phase3(int btype, char *port){
-    struct addrinfo hints, *res;
-    char mesg[1000], auth_mesg[100];
-    struct sockaddr_storage their_addr;
-    char buf[MAXBUFLEN];
+int phase3(int btype, char *port, char *servport){
+    struct addrinfo hints, *server, *myaddr;
+    char mesg[1000];
+    //struct sockaddr_storage their_addr;
+    struct sockaddr their_addr;
+    char buf[1000];
     socklen_t addr_len;
 
     memset(&hints, 0, 1000);
     hints.ai_family = AF_INET;
     hints.ai_socktype = SOCK_DGRAM;
 
-    if((getaddrinfo(HOST, port, &hints, &res)) != 0){
+    if((getaddrinfo(HOST, servport, &hints, &server)) != 0){
+        perror("GetAddrInfo");
+        exit(0);
+    }
+
+    if((getaddrinfo(HOST, port, &hints, &myaddr)) != 0){
         perror("GetAddrInfo");
         exit(0);
     }
@@ -63,25 +86,36 @@ int phase3(int btype, char *port){
     /*PRINT*/
     printf("Phase 3: <Bidder%d#> has UDP port %s and IP address: %s\n", btype, port, HOST);
 
-    int sock = socket(res->ai_family, res->ai_socktype, 0);
+    int sock = socket(myaddr->ai_family, myaddr->ai_socktype, 0);
     if(sock==-1){
         perror("Socket");
         exit(0);
     }
 
-    if(bind(sock, res->ai_addr, res->ai_addrlen)==-1){
+    if(bind(sock, myaddr->ai_addr, myaddr->ai_addrlen)==-1){
         perror("Bind");
         exit(0);
     }
 
-    int numbytes;
-    if ((numbytes = recvfrom(sock, buf, MAXBUFLEN-1 , 0, (struct sockaddr *)&their_addr, &addr_len)) == -1) {
+   int numbytes;
+   if ((numbytes = recvfrom(sock, buf, MAXBUFLEN-1 , 0, &their_addr, &addr_len)) == -1) {
         perror("recvfrom");
         exit(1);
     }
 
     /*PRINT*/
-    printf("Phase 3: %s\n", buf);
+    printf("Phase 3: Items up for sale\n%s\n", buf);
+
+    sleep(10);
+    read_FILE(mesg, "bidding1.txt");
+    /*Send bids to the AS*/
+    if((sendto(sock, mesg, MAXBUFLEN-1, 0, server->ai_addr, server->ai_addrlen)) < 0) {
+        perror("sendto");
+        exit(1);
+    }
+
+    /*PRINT*/
+    printf("Phase 3: <Bidder#%d> Make bidding for\n%s", btype, mesg);
 
     /*PRINT*/
     printf("End of Phase 3 for Bidder%d.\n", btype);
@@ -126,14 +160,14 @@ void phase1(int btype){
 int bidder1(){
     /*Bidder two run by parent process*/
     //phase1(1);
-    phase3(1, PHASE3_UDP_BIDDER1_PORT);
+    phase3(1, PHASE3_UDP_BID1_PORT, PHASE3_UDP_AS_BID1_PORT);
     return 0;
 }
 
 int bidder2(){
     /*Bidder two run by child process*/
     //phase1(2);
-    phase3(2, PHASE3_UDP_BIDDER2_PORT);
+    phase3(2, PHASE3_UDP_BID2_PORT, PHASE3_UDP_AS_BID2_PORT);
     return 1;
 }
 
@@ -145,7 +179,7 @@ int main(int argc, char *argv[]){
     }
     else{
         /*Parent*/
-        //bidder1();
+        bidder1();
     }
     
     /*Wait for the child to over itself*/
