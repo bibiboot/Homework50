@@ -21,33 +21,43 @@
 #define PHASE2_TCP_PORT "1200"
 #define PHASE3_UDP_BID1 "3100"
 #define PHASE3_UDP_BID2 "3200"
+#define PHASE3_TCP_SELLER1_PORT "2100"
+#define PHASE3_TCP_SELLER2_PORT "2200"
+#define PHASE3_TCP_BIDDER1_PORT "4100"
+#define PHASE3_TCP_BIDDER2_PORT "4200"
 #define MAXBUFLEN 100
 /*Are suppose to be dynamic*/
 #define PHASE3_TCP "7000"
 #define PHASE3_UDP_AS_BID1_PORT "6200"
 #define PHASE3_UDP_AS_BID2_PORT "6300"
 
+char SELLER1[100] = "Taylor";
+char SELLER2[100] = "Julia";
 
 struct bid {
     char name[100];
     char item[100];
     char price[100];
+    int bidtype;
 };
 
 
 void print_bidarray(struct bid *b, int size){
+    /*Print the structure b*/
     printf("----------\n"); 
-    int i; for(i=0;i<size;i++)
+    int i; 
+    for(i=0;i<size;i++){
         printf("%s\t%s\t%s\n", b[i].name, b[i].item, b[i].price);
+    }
     printf("----------\n"); 
 }
 
 int price_of(struct bid *b, int size, char *name, char *item){
     /*Traverses the array of bids looking for the name and item*/
-    printf("Looking for %s---and Looking for %s\n", name, item);
+    //printf("Looking for %s---and Looking for %s\n", name, item);
     int i;
     for(i=0;i<size;i++){
-        printf("Traversing %s---and Traversing for %s\n", b[i].name, b[i].item);
+        //printf("Traversing %s---and Traversing for %s\n", b[i].name, b[i].item);
         if(strcmp(b[i].name, name)==0 && strcmp(b[i].item, item)==0){
             /*Match found, now return*/
             return atoi(b[i].price);
@@ -56,17 +66,43 @@ int price_of(struct bid *b, int size, char *name, char *item){
     return -1;
 }
 
-int compare(struct bid *broadCast, int size, struct bid *b1, int size1, struct bid *b2, int size2){
+int compare(struct bid *broadCast, int size, struct bid *b1, int size1, struct bid *b2, int size2, struct bid *result, int *rsize){
     /*Compare the values of the bids and find the appropriate match*/ 
-    int i;
+ 
+    int sell_price;
+    int i, bidtype  ;
+    (*rsize)=0;
     for(i=0;i<size;i++){
         int price1 = price_of(b1, size1, broadCast[i].name, broadCast[i].item);
         int price2 = price_of(b2, size2, broadCast[i].name, broadCast[i].item);
-        printf("Price1 = %d Price2 = %d\n", price1, price2);
+        if(price1 >= atoi(broadCast[i].price) && price1 >= price2){
+            /*Bidder1 won*/
+           printf("SOLD1: bid = %d bid2 = %d and orignal = %s\n", price1, price2, broadCast[i].price);
+           sell_price = price1;
+           (*rsize)++; 
+           bidtype = 1;
+        }
+        else if(price2 >= atoi(broadCast[i].price) && price2 >= price1){
+            /*Bidder2 won*/
+           sell_price = price2;
+           printf("SOLD2: bid = %d bid2 = %d and orignal = %s\n", price1, price2, broadCast[i].price);
+           (*rsize)++; 
+           bidtype = 2;
+        }
+        else{
+            //printf("NOT SOLD: bid = %d bid2 = %d and orignal = %s\n", price1, price2, broadCast[i].price);
+            continue;
+        }
+
+        /*Fill the result structure*/
+        char st[15];
+        sprintf(st, "%d", sell_price);
+        strcpy(result[i].name, broadCast[i].name);
+        strcpy(result[i].item, broadCast[i].item);
+        strcpy(result[i].price, st);
+        result[i].bidtype = bidtype;
     }
 }
-
-
 
 int ipaddr_client(struct sockaddr cli_addr, char **human_cli_addr){
     /*Convert sockaddr to human string ip address*/
@@ -103,7 +139,7 @@ int file_to_bid_struct(struct bid *b, char *path, int *size){
 }
 
 int authenticate(char *mesg, char *client_ip){
-    /*Return 0 is 
+    /*Return 0 is*/ 
     /*Message format: "Login#username password bankaccount*/
     char username[100], password[100], bankaccount[100];
     char *arg = strchr(mesg, '#')+1;
@@ -228,19 +264,117 @@ int phase3(){
     }
 }
 
+int phase3_send_decision(int size, struct bid *result, char *client_name, struct addrinfo *their_addr, int sock  ){
+    /*Seller uses this to send message*/
+    char result_mesg[50], total_mesg[500];
+    strcpy(total_mesg, "");
+    if(connect(sock, their_addr->ai_addr, their_addr->ai_addrlen)<0){
+         perror("Conect");
+         exit(1);
+    }
+    int i;
+    for(i=0; i<size; i++){
+        if(strcmp(result[i].name, client_name  )==0){
+            sprintf(result_mesg, "Phase 3: Item %s was sold at price %s\n", result[i].item, result[i].price);
+            strcat(total_mesg, result_mesg);
+       }
+        else{
+            //sprintf(result_mesg, "Phase 3: Item %s was not sold at price %s\n", result[i].item, result[i].price);
+            //printf("%s\t %s",result[i].name, result_mesg);
+            continue;
+        }
+    }
+    printf("%s", total_mesg);
+    if(send(sock, total_mesg, 200, 0) < 0){
+        perror("Send\n");
+        exit(1);
+    }
+}
+
+int phase3_send_decision_bidder(int size, struct bid *result, struct addrinfo *their_addr, int sock, int bidtype  ){
+    /*Bidder uses this to send message*/
+    char result_mesg[50], total_mesg[500];
+    strcpy(total_mesg, "");
+    if(connect(sock, their_addr->ai_addr, their_addr->ai_addrlen)<0){
+         perror("Conect");
+         exit(1);
+    }
+    int i;
+    for(i=0; i<size; i++){
+        if(result[i].bidtype == bidtype){
+            sprintf(result_mesg, "Phase 3: Item %s was sold at price %s\n", result[i].item, result[i].price);
+            strcat(total_mesg, result_mesg);
+       }
+        else{
+            //sprintf(result_mesg, "Phase 3: Item %s was not sold at price %s\n", result[i].item, result[i].price);
+            //printf("%s\t %s",result[i].name, result_mesg);
+            continue;
+        }
+    }
+    printf("%s", total_mesg);
+    if(send(sock, total_mesg, 200, 0) < 0){
+        perror("Send\n");
+        exit(1);
+    }
+}
+
 int phase3_decision(){
     int size1, size2, size;
     struct bid *b1  = (struct bid*)(malloc(sizeof(struct bid)*6));
     struct bid *b2  = (struct bid*)(malloc(sizeof(struct bid)*6));
     struct bid *bcast  = (struct bid*)(malloc(sizeof(struct bid)*6));
+    struct bid *result  = (struct bid*)(malloc(sizeof(struct bid)*6));
 
     file_to_bid_struct(b1, TEMP_FILE_1, &size1);
-    file_to_bid_struct(b2, TEMP_FILE_2, &size1);
-    file_to_bid_struct(bcast, BFILE, &size1);
+    file_to_bid_struct(b2, TEMP_FILE_2, &size2);
+    file_to_bid_struct(bcast, BFILE, &size);
 
-    compare(bcast, size, b1, size1, b2, size2);
+    int rsize;
+    compare(bcast, size, b1, size1, b2, size2, result, &rsize);
 
     /*Make TCP Connection and send result*/
+
+    int i;
+    struct addrinfo hints, *bid1, *bid2, *sel1, *sel2, *myaddr;
+    char mesg[100];
+    strcpy(mesg, "Hello\n");
+
+    memset(&hints, 0, 100);
+    hints.ai_family = AF_INET;
+    hints.ai_socktype = SOCK_STREAM;
+
+    getaddrinfo(HOST, PHASE3_TCP_SELLER1_PORT, &hints, &sel1);
+    getaddrinfo(HOST, PHASE3_TCP_SELLER2_PORT, &hints, &sel2);
+    getaddrinfo(HOST, PHASE3_TCP_BIDDER1_PORT, &hints, &bid1);
+    getaddrinfo(HOST, PHASE3_TCP_BIDDER2_PORT, &hints, &bid2);
+    getaddrinfo(HOST, "8019", &hints, &myaddr);
+
+    int sock = socket(bid1->ai_family, bid1->ai_socktype, 0);
+    if(bind(sock, myaddr->ai_addr, myaddr->ai_addrlen)==-1){
+        perror("Bind");
+        exit(0);
+    }
+
+    phase3_send_decision(rsize, result, SELLER1, sel1, sock);
+    close(sock);
+
+    int sock2 = socket(bid1->ai_family, bid1->ai_socktype, 0);
+    if(bind(sock2, myaddr->ai_addr, myaddr->ai_addrlen)==-1){
+        perror("Bind");
+    }
+    phase3_send_decision(size, result, SELLER2, sel2, sock2);
+
+    int sock3 = socket(bid1->ai_family, bid1->ai_socktype, 0);
+    if(bind(sock3, myaddr->ai_addr, myaddr->ai_addrlen)==-1){
+        perror("Bind");
+    }
+    phase3_send_decision_bidder(size, result, bid1, sock3, 1);
+
+    int sock4 = socket(bid1->ai_family, bid1->ai_socktype, 0);
+    if(bind(sock4, myaddr->ai_addr, myaddr->ai_addrlen)==-1){
+        perror("Bind");
+    }
+    phase3_send_decision_bidder(size, result, bid2, sock4, 2);
 
     /*PRINT*/
     printf("End of Phase 3 for Auction Server.\n");
@@ -266,7 +400,6 @@ int phase2(){
         perror("GetAddrInfo");
         exit(0);
     }
-
 
     /*PRINT*/
     printf("Phase 2: Auction Server IP Address: %s PreAuction TCP Port Number: %s\n", HOST, PHASE2_TCP_PORT);
@@ -312,7 +445,7 @@ int phase2(){
         fprintf(fp, "%s", mesg);
 
         /*PRINT*/
-        printf("Phase 2: %s", mesg);
+        printf("Phase 2: \n%s", mesg);
 
         /*After two sellers are added*/
         if(count++==1) break;
@@ -325,7 +458,8 @@ int phase2(){
 
 
 int phase1(){
-    // Socket Connection
+    /*Check the authentication of the seller and bidders*/
+    /*Add the seller name to the lost*/
     struct addrinfo hints, *res;
     char mesg[1000], auth_mesg[100];
 
@@ -392,29 +526,18 @@ int phase1(){
           Save the ip address and name together,
           Send the user the ipaddr and port num for
           next two phases.*/
-        if(count++==1)break;
+        if(count++==3)break;
 
     }
     printf("End of Phase 1 for Auction Server\n");
     return 0;
 }
 
-
-void test2(){
-    int size, size1, size2;
-    struct bid *barray  = (struct bid*)(malloc(sizeof(struct bid)*6));
-    file_to_bid_struct(barray, BFILE, &size);
-    struct bid *b1  = (struct bid*)(malloc(sizeof(struct bid)*6));
-    file_to_bid_struct(b1, "bidding1.txt", &size1);
-    struct bid *b2  = (struct bid*)(malloc(sizeof(struct bid)*6));
-    file_to_bid_struct(b2, "bidding2.txt", &size2);
-    compare(barray, size, b1, size1, b2, size2);
-}
-
 int main(int argc, char *argv[]){
     /*Main function*/
     //phase1();
     //phase2();
-    phase3();
+    //phase3();
     phase3_decision();
+    return 0;
 }

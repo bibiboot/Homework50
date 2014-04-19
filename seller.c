@@ -12,10 +12,11 @@
 
 #define CRED_FILE1 "sellerPass1.txt"
 #define CRED_FILE2 "sellerPass2.txt"
-
-char PHASE1_PORT[100] = "9011";
-char PHASE2_PORT[100] = "9002";
-char HOST[100] = "127.0.0.1";
+#define PHASE1_PORT "1100"
+#define PHASE2_PORT "1200"
+#define PHASE3_PORT_SELLER1 "2100"
+#define PHASE3_PORT_SELLER2 "2200"
+#define HOST "127.0.0.1"
 
 int ipaddr_client(struct sockaddr cli_addr, char **human_cli_addr){
     /*Convert sockaddr to human string ip address*/
@@ -41,6 +42,9 @@ int strip_newline(char *given, char *result){
 }
 
 int get_cred(int btype, char *result){
+    /*Reads through the cred file and creates
+    auth request string
+    */
     FILE *fp;
     if(btype==1)
         fp = fopen(CRED_FILE1, "r");
@@ -62,12 +66,13 @@ int read_itemList(int btype, int sock){
     /*Read from the correct itemList.txt and
       send it to the authentication server
     */
-    FILE *fp;
     int i=0;
+    FILE *fp;
     char buff[100], name[100], path[100], mesg[100], tmesg[1000];
     sprintf(path, "itemList%d.txt", btype);
     strcpy(tmesg, "");
 
+    /*Open the itemsList*/
     fp = fopen(path, "r");
 
     while(fgets(buff, 100, fp)!=NULL){
@@ -82,14 +87,70 @@ int read_itemList(int btype, int sock){
         sprintf(mesg, "%s %s", name, buff);
         strcat(tmesg, mesg);
     }
+
+    /*Send auth request to auction server*/
     if(send(sock, tmesg, 100, 0) == -1){
         perror("Send\n");
     }
+
     /*PRINT*/
     printf("Phase 2: <Seller%d> send item lists.\n", btype);
-    printf("Phase 2: %s", tmesg);
+    printf("Phase 2: \n%s", tmesg);
     return 0;
 }
+
+int phase3(int btype, char *port){
+    /*
+    PHASE3
+    Open new tcp connection with the AS.
+    Send the itemList to the AS.
+    Close the server
+    */
+    char buff[500];
+    struct addrinfo hints, *res;
+    struct sockaddr cli_addr;
+    int client_addr_size = sizeof(cli_addr);
+
+    memset(&hints, 0, 100);
+    hints.ai_family = AF_INET;
+    hints.ai_socktype = SOCK_STREAM;
+
+    getaddrinfo(HOST, port, &hints, &res);
+
+    int sock = socket(res->ai_family, res->ai_socktype, 0);
+    if(sock==-1){
+        perror("Socket");
+        exit(0);
+    }
+
+    if(bind(sock, res->ai_addr, res->ai_addrlen)==-1){
+        perror("Bind");
+        exit(0);
+    }
+
+    if(listen(sock, 10)==-1){
+        perror("Listen");
+        exit(0);
+     }
+
+    printf(".....Waiting..........%d\n", btype);
+    int new_sock = accept(sock, &cli_addr, &client_addr_size);
+    if(new_sock==-1){
+        perror("Accept");
+    }
+    printf(".....Connected........\n");
+
+    int num;
+    if((num = recv(new_sock, buff, 500, 0)) == -1){
+        perror("Recv\n");
+        exit(1);
+    }
+    /*PRINT*/
+    printf("%s", buff);
+    /*PRINT*/
+    printf("Phase 3: End of Phase 3 for <Seller%d>.\n", btype);
+}
+
 
 int phase2(int btype){
     /*
@@ -98,9 +159,6 @@ int phase2(int btype){
     Send the itemList to the AS.
     Close the server
     */
-    int client_port;
-    char mesg[100], buff[100];
-    char *client_ip;
     struct addrinfo hints, *res;
 
     memset(&hints, 0, 100);
@@ -119,9 +177,6 @@ int phase2(int btype){
         exit(0);
     }
 
-    ipaddr_client(*(res->ai_addr), &client_ip);
-    struct sockaddr_in *cli_addr_in = (struct sockaddr_in*)(res->ai_addr);
-
     /*PRINT*/
     printf("Phase 2: Auction Server IP Address: %s PreAuction Port Number: %s.\n", HOST, PHASE2_PORT);
 
@@ -135,10 +190,11 @@ int phase2(int btype){
 
 
 void phase1(int btype){
+    /*Authentication of the bidder takes place here*/
 
+    char *client_ip;
     int client_port;
     char mesg[100], buff[100];
-    char *client_ip;
     struct addrinfo hints, *res;
 
     memset(&hints, 0, 100);
@@ -152,6 +208,7 @@ void phase1(int btype){
         perror("Socket");
         exit(0);
     }
+
     if(connect(client_sock, res->ai_addr, res->ai_addrlen)<0){
         perror("Connect");
         exit(0);
@@ -181,23 +238,27 @@ void phase1(int btype){
 
 int seller1(){
     /*Bidder two run by parent process*/
-    phase1(1);
-    sleep(10);
-    phase2(1);
+    //phase1(1);
+    //sleep(10);
+    //phase2(1);
+    phase3(1, PHASE3_PORT_SELLER1);
     return 0;
 }
 
 int seller2(){
     /*Bidder two run by child process*/
-    phase1(2);
-    sleep(10);
-    phase2(2);
+    //phase1(2);
+    //sleep(10);
+    //phase2(2);
+    phase3(2, PHASE3_PORT_SELLER2);
     return 0;
 }
 
 int main(int argc, char *argv[]){
+    /*Flow starts here*/
     int pid;
 
+    /*Fork for two sellers*/
     if((pid=fork())==0){
         seller2();
     }
@@ -208,4 +269,5 @@ int main(int argc, char *argv[]){
     /*Wait for the child to over itself*/
     int status;
     waitpid(pid, &status, 0);
+    return 0;
 }

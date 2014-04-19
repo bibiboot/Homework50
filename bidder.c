@@ -10,17 +10,20 @@
 #include <arpa/inet.h> 
 #include <sys/wait.h> 
 
+#define MAXBUFLEN 100
 #define CRED_FILE1 "bidderPass1.txt"
 #define CRED_FILE2 "bidderPass2.txt"
 #define PHASE3_UDP_BID1_PORT "3100"
 #define PHASE3_UDP_BID2_PORT "3200"
+#define PHASE3_TCP_BID1_PORT "4100"
+#define PHASE3_TCP_BID2_PORT "4200"
+#define PORT  "1100"
+#define HOST "127.0.0.1"
+
+/*Remove it later*/
 #define PHASE3_UDP_AS_BID1_PORT "6200"
 #define PHASE3_UDP_AS_BID2_PORT "6300"
-
-#define MAXBUFLEN 100
-
-char PORT[100] = "1100";
-char HOST[100] = "127.0.0.1";
+/*Remove it later*/
 
 int read_FILE(char *tmesg, char *path){
     /*Read from the correct itemList.txt and
@@ -45,6 +48,7 @@ int ipaddr_client(struct sockaddr cli_addr, char **human_cli_addr){
 }
 
 int get_cred(int btype, char *result){
+    /*Get credential in the form of authentication*/
     FILE *fp;
     if(btype==1)
         fp = fopen(CRED_FILE1, "r");
@@ -61,12 +65,66 @@ int get_cred(int btype, char *result){
     return 0;
 }
 
+
+int phase3_final(int btype, char *port){
+    /*
+    PHASE3
+    Open new tcp connection with the AS.
+    Send the itemList to the AS.
+    Close the server
+    */
+    int client_port;
+    char mesg[100], buff[500];
+    char *client_ip;
+    struct addrinfo hints, *res;
+
+    memset(&hints, 0, 100);
+    hints.ai_family = AF_INET;
+    hints.ai_socktype = SOCK_STREAM;
+
+    getaddrinfo(HOST, port, &hints, &res);
+
+    int sock = socket(res->ai_family, res->ai_socktype, 0);
+    if(sock==-1){
+        perror("Socket");
+        exit(0);
+    }
+
+    if(bind(sock, res->ai_addr, res->ai_addrlen)==-1){
+        perror("Bind");
+        exit(0);
+    }
+
+    if(listen(sock, 10)==-1){
+        perror("Listen");
+        exit(0);
+     }
+
+    struct sockaddr cli_addr;
+    int client_addr_size = sizeof(cli_addr);
+    printf(".....Waiting..........%d\n", btype);
+    int new_sock = accept(sock, &cli_addr, &client_addr_size);
+    if(new_sock==-1){
+        perror("Accept");
+    }
+    printf(".....Connected........\n");
+
+    int num;
+    if((num = recv(new_sock, buff, 500, 0)) == -1){
+        perror("Recv\n");
+        exit(1);
+    }
+    /*PRINT*/
+    printf("%s", buff);
+    /*PRINT*/
+    printf("Phase 3: End of Phase 3 for <Bidder%d>.\n", btype);
+
+}
+
 int phase3(int btype, char *port, char *servport){
     struct addrinfo hints, *server, *myaddr;
-    char mesg[1000];
-    //struct sockaddr_storage their_addr;
+    char mesg[1000], buf[1000];
     struct sockaddr their_addr;
-    char buf[1000];
     socklen_t addr_len;
 
     memset(&hints, 0, 1000);
@@ -160,29 +218,30 @@ void phase1(int btype){
 int bidder1(){
     /*Bidder two run by parent process*/
     //phase1(1);
-    phase3(1, PHASE3_UDP_BID1_PORT, PHASE3_UDP_AS_BID1_PORT);
+    //phase3(1, PHASE3_UDP_BID1_PORT, PHASE3_UDP_AS_BID1_PORT);
+    phase3_final(1, PHASE3_TCP_BID1_PORT);
     return 0;
 }
 
 int bidder2(){
     /*Bidder two run by child process*/
     //phase1(2);
-    phase3(2, PHASE3_UDP_BID2_PORT, PHASE3_UDP_AS_BID2_PORT);
+    //phase3(2, PHASE3_UDP_BID2_PORT, PHASE3_UDP_AS_BID2_PORT);
+    phase3_final(2, PHASE3_TCP_BID2_PORT);
     return 1;
 }
 
 int main(int argc, char *argv[]){
     int pid;
     if((pid=fork())==0){
-        /*Child*/
         bidder2();
     }
     else{
-        /*Parent*/
         bidder1();
     }
     
     /*Wait for the child to over itself*/
     int status;
     waitpid(pid, &status, 0);
+    return 0;
 }
