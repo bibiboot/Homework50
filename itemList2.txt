@@ -1,4 +1,5 @@
-Matt 
-Dress1 50 
-Dress2 80 
-Watch1 120
+Julia
+Skirt1 80
+Shirt2 100
+Watch1 100
+Watch2 150

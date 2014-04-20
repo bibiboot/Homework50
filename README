@@ -4,3 +4,20 @@ What have i done in the project:
 What my code files are and what each one of them does
 Steps to be followed to run the project:
 
+1. First start the auction_server.
+2. Auction server wait for authentication.
+3. Start the bidders 
+4. After bidders are authenticated, bidders will wait for server to send its list.
+5. Now start the sellers. 
+
+
+Except Phase1
+1. Start bid
+2. Start AS
+3. Start sel
+
+
+All together
+1. Start AS: Waiting for authentication.
+2. Start BID: Will authenticate and go into phase 3 waiting for the broadcasted list.
+3. Start SEL: Will authenticate and go to phase 2 after sleeping for 10 seconds and then send itemList.
