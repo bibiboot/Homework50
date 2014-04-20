@@ -161,7 +161,7 @@ int phase2(int btype){
     */
     struct addrinfo hints, *res;
 
-    memset(&hints, 0, 100);
+    memset(&hints, 0, 50);
     hints.ai_family = AF_INET;
     hints.ai_socktype = SOCK_STREAM;
 
@@ -239,8 +239,8 @@ void phase1(int btype){
 int seller1(){
     /*Bidder two run by parent process*/
     //phase1(1);
-    //sleep(10);
-    //phase2(1);
+    sleep(10);
+    phase2(1);
     phase3(1, PHASE3_PORT_SELLER1);
     return 0;
 }
@@ -249,7 +249,7 @@ int seller2(){
     /*Bidder two run by child process*/
     //phase1(2);
     //sleep(10);
-    //phase2(2);
+    phase2(2);
     phase3(2, PHASE3_PORT_SELLER2);
     return 0;
 }

@@ -242,7 +242,7 @@ int phase3(){
 
         /*Send broadcast information*/
         /*PRINT*/
-        printf("Phase 3: Items for sale\n%s\n", mesg);
+        printf("Phase 3: Items for sale\n%s", mesg);
 
         int numbytes;
         if ((numbytes = recvfrom(sock, buf, MAXBUFLEN-1 , 0, (struct sockaddr *)&their_addr, &addr_len)) == -1) {
@@ -347,7 +347,9 @@ int phase3_decision(){
     getaddrinfo(HOST, PHASE3_TCP_SELLER2_PORT, &hints, &sel2);
     getaddrinfo(HOST, PHASE3_TCP_BIDDER1_PORT, &hints, &bid1);
     getaddrinfo(HOST, PHASE3_TCP_BIDDER2_PORT, &hints, &bid2);
-    getaddrinfo(HOST, "8019", &hints, &myaddr);
+    getaddrinfo(HOST, "8020", &hints, &myaddr);
+
+    //print_bidarray(result, rsize);
 
     int sock = socket(bid1->ai_family, bid1->ai_socktype, 0);
     if(bind(sock, myaddr->ai_addr, myaddr->ai_addrlen)==-1){
@@ -356,7 +358,6 @@ int phase3_decision(){
     }
 
     phase3_send_decision(rsize, result, SELLER1, sel1, sock);
-    close(sock);
 
     int sock2 = socket(bid1->ai_family, bid1->ai_socktype, 0);
     if(bind(sock2, myaddr->ai_addr, myaddr->ai_addrlen)==-1){
@@ -365,10 +366,12 @@ int phase3_decision(){
     phase3_send_decision(size, result, SELLER2, sel2, sock2);
 
     int sock3 = socket(bid1->ai_family, bid1->ai_socktype, 0);
+
     if(bind(sock3, myaddr->ai_addr, myaddr->ai_addrlen)==-1){
         perror("Bind");
     }
     phase3_send_decision_bidder(size, result, bid1, sock3, 1);
+    close(sock3);
 
     int sock4 = socket(bid1->ai_family, bid1->ai_socktype, 0);
     if(bind(sock4, myaddr->ai_addr, myaddr->ai_addrlen)==-1){
@@ -388,7 +391,6 @@ int phase2(){
     /*Open the broadcast file
       if not present, then create
     */
-    fp = fopen(BFILE, "w");
     struct addrinfo hints, *res;
     char mesg[1000], auth_mesg[100];
 
@@ -422,6 +424,7 @@ int phase2(){
 
     int count=0;
 
+   fp = fopen(BFILE, "w+");
     while(1){
         printf(".....Waiting..........\n");
         struct sockaddr cli_addr;
@@ -445,16 +448,15 @@ int phase2(){
         fprintf(fp, "%s", mesg);
 
         /*PRINT*/
-        printf("Phase 2: \n%s", mesg);
+        printf("Phase 2: Writing\n%s", mesg);
 
         /*After two sellers are added*/
         if(count++==1) break;
     }
-    printf("End of Phase 2 for Auction Server\n");
+    fclose(fp);
+
     return 0;
 }
-
-
 
 
 int phase1(){
@@ -536,8 +538,8 @@ int phase1(){
 int main(int argc, char *argv[]){
     /*Main function*/
     //phase1();
-    //phase2();
-    //phase3();
+    phase2();
+    phase3();
     phase3_decision();
     return 0;
 }

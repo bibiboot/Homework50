@@ -155,6 +155,7 @@ int phase3(int btype, char *port, char *servport){
         exit(0);
     }
 
+   printf("Waiting......\n");
    int numbytes;
    if ((numbytes = recvfrom(sock, buf, MAXBUFLEN-1 , 0, &their_addr, &addr_len)) == -1) {
         perror("recvfrom");
@@ -194,7 +195,10 @@ void phase1(int btype){
 
     char *client_ip;
     int client_sock = socket(res->ai_family, res->ai_socktype, 0);
-    connect(client_sock, res->ai_addr, res->ai_addrlen);
+    if(connect(client_sock, res->ai_addr, res->ai_addrlen)<0){
+        perror("Connect");
+        exit(1);
+    }
 
     ipaddr_client(*(res->ai_addr), &client_ip);
     struct sockaddr_in *cli_addr_in = (struct sockaddr_in*)(res->ai_addr);
@@ -213,12 +217,15 @@ void phase1(int btype){
     }
     /*PRINT*/
     printf("Phase 1: Login request reply: %s.\n", buff);
+
+    if(strcmp("#Rejected", buff)==0)
+        exit(1);
 }
 
 int bidder1(){
     /*Bidder two run by parent process*/
     //phase1(1);
-    //phase3(1, PHASE3_UDP_BID1_PORT, PHASE3_UDP_AS_BID1_PORT);
+    phase3(1, PHASE3_UDP_BID1_PORT, PHASE3_UDP_AS_BID1_PORT);
     phase3_final(1, PHASE3_TCP_BID1_PORT);
     return 0;
 }
@@ -226,7 +233,7 @@ int bidder1(){
 int bidder2(){
     /*Bidder two run by child process*/
     //phase1(2);
-    //phase3(2, PHASE3_UDP_BID2_PORT, PHASE3_UDP_AS_BID2_PORT);
+    phase3(2, PHASE3_UDP_BID2_PORT, PHASE3_UDP_AS_BID2_PORT);
     phase3_final(2, PHASE3_TCP_BID2_PORT);
     return 1;
 }
