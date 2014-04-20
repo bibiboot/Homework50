@@ -118,6 +118,9 @@ int phase3_final(int btype, char *port){
     printf("%s", buff);
     /*PRINT*/
     printf("Phase 3: End of Phase 3 for <Bidder%d>.\n", btype);
+   
+    close(new_sock);
+    close(sock);
 
 }
 
@@ -176,8 +179,7 @@ int phase3(int btype, char *port, char *servport){
     /*PRINT*/
     printf("Phase 3: <Bidder#%d> Make bidding for\n%s", btype, mesg);
 
-    /*PRINT*/
-    printf("End of Phase 3 for Bidder%d.\n", btype);
+    close(sock);
 }
 
 
@@ -224,7 +226,7 @@ void phase1(int btype){
 
 int bidder1(){
     /*Bidder two run by parent process*/
-    //phase1(1);
+    phase1(1);
     phase3(1, PHASE3_UDP_BID1_PORT, PHASE3_UDP_AS_BID1_PORT);
     phase3_final(1, PHASE3_TCP_BID1_PORT);
     return 0;
@@ -232,7 +234,7 @@ int bidder1(){
 
 int bidder2(){
     /*Bidder two run by child process*/
-    //phase1(2);
+    phase1(2);
     phase3(2, PHASE3_UDP_BID2_PORT, PHASE3_UDP_AS_BID2_PORT);
     phase3_final(2, PHASE3_TCP_BID2_PORT);
     return 1;

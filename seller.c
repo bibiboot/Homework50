@@ -147,6 +147,10 @@ int phase3(int btype, char *port){
     }
     /*PRINT*/
     printf("%s", buff);
+
+    close(new_sock);
+    close(sock);
+
     /*PRINT*/
     printf("Phase 3: End of Phase 3 for <Seller%d>.\n", btype);
 }
@@ -185,6 +189,9 @@ int phase2(int btype){
 
     /*PRINT*/
     printf("End of Phase 2 for <Seller%d>.\n", btype);
+
+    /*Closing the socket*/
+    close(client_sock);
     return 0;
 }
 
@@ -234,11 +241,13 @@ void phase1(int btype){
     printf("Phase 1: Login request reply: %s.\n", buff);
     printf("End of Phase 1 for <Seller%d>.\n", btype);
 
+    close(client_sock);
+
 }
 
 int seller1(){
     /*Bidder two run by parent process*/
-    //phase1(1);
+    phase1(1);
     sleep(10);
     phase2(1);
     phase3(1, PHASE3_PORT_SELLER1);
@@ -247,7 +256,7 @@ int seller1(){
 
 int seller2(){
     /*Bidder two run by child process*/
-    //phase1(2);
+    phase1(2);
     //sleep(10);
     phase2(2);
     phase3(2, PHASE3_PORT_SELLER2);
